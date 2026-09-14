@@ -25,10 +25,11 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
+    // 将仓库根目录的 www/ 作为 assets 打包进 APK
     sourceSets {
         main {
             assets {
-                srcDirs = ['src/main/assets', '$rootDir/../www']
+                srcDirs = [file("$projectDir/../../www")]
             }
         }
     }
