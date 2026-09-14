@@ -1,56 +1,74 @@
-# NCM 解密器 Pro — 快速开始
+# 快速开始 & 构建指南
 
-## 方式一：直接用 APK（推荐）
+## 一、启用自动构建（GitHub Actions）
 
-1. 下载 `NCM-Decoder-Pro.apk`（GitHub Releases）
-2. 手机安装 → 允许「未知来源」
-3. 打开 → 选 .ncm 文件 → 选保存文件夹 → 转换
+> 仓库已含全部源代码，**只需添加 `build-apk.yml` 即可自动构建 APK**。
 
-## 方式二：从源码构建
+### GitHub 网页新建（仅需一次）
+1. 打开 👉 https://github.com/muxiniu/ncm-decoder-pro/new/main
+2. 文件名框**完整输入**：`.github/workflows/build-apk.yml`
+3. 粘贴下方 Workflow 内容 → Commit changes
+4. 之后 push 到 main 自动构建，APK 发布到 Release `v2.0-pro`
 
+### Workflow 内容
+```yaml
+name: Build NCM Decoder Pro APK
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+      - uses: android-actions/setup-android@v3
+      - name: Build debug APK
+        working-directory: android
+        run: gradle assembleDebug --no-daemon
+      - name: Rename APK
+        working-directory: android/app/build/outputs/apk/debug
+        run: cp app-debug.apk NCM-Decoder-Pro.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0-pro
+          name: NCM 解密器 Pro v2.0
+          files: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+> 💡 保存提示权限错误 → PAT 需勾选 `workflow` 权限。
+
+### 构建完成
+- APK：https://github.com/muxiniu/ncm-decoder-pro/releases/tag/v2.0-pro
+- 日志：https://github.com/muxiniu/ncm-decoder-pro/actions
+
+## 二、本地构建
 ```bash
-# 需要 JDK 17 + Android SDK (API 33)
-cd android
-./gradlew assembleRelease
-# 输出: android/app/build/outputs/apk/release/app-release.apk
+git clone https://github.com/muxiniu/ncm-decoder-pro.git
+cd ncm-decoder-pro/android
+./gradlew assembleDebug
+# APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 方式三：网页版测试
+## 三、使用 App
+1. 安装 APK → 打开
+2. 选择 `.ncm` 文件（可多选）
+3. 选保存文件夹
+4. （可选）改文件名模板 `{artist} - {title}`
+5. 开始转换 ✅
 
-直接用浏览器打开 `www/index.html`（选文件 / 转换逻辑可用，保存需安卓环境）。
-
-## 使用步骤
-
-```
-第1步  选择 NCM 文件（可多选）
-第2步  选择保存文件夹
-第3步  设置输出格式 + 文件名模板
-第4步  开始转换 → 完成
-```
-
-## 文件名模板变量
-
-- `{title}` - 标题
-- `{artist}` - 艺术家
-- `{album}` - 专辑
-
-例：`{artist} - {title}` → `周杰伦 - 晴天.mp3`
-
-## FAQ
-
-**Q: 点选择文件没反应？**
-A: 请确保已授予存储权限，并等待应用重启后重试。
-
-**Q: 转换失败？**
-A: 确认文件是有效的 .ncm 文件（网易云音乐下载的加密格式）。
-
-**Q: 能否批量转换？**
-A: 可以，选择文件时多选即可。
-
-## 测试（开发用）
-
-```bash
-node tests/test_core.js         # 解密核心 13/13
-node tests/verify.js            # 前后端桥接 17/17
-node tests/check_structure.js   # 结构完整性 35/35
-```
+## 四、与旧版区分（可同时安装）
+| 项目 | 旧版 | 新版 |
+|------|------|------|
+| 仓库 | ncm-converter-android | **ncm-decoder-pro** |
+| 应用名 | NCM 转换器 | **NCM 解密器 Pro** |
+| 包名 | com.ncmconverter.app | **com.ncmdecoder.pro** |
+| APK | NCM-Converter.apk | **NCM-Decoder-Pro.apk** |
+| 版本 | v1.0 | **v2.0** |
