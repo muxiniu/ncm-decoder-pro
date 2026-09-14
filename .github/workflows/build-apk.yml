@@ -2,7 +2,7 @@ name: Build NCM Decoder Pro APK
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -19,87 +19,46 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle (install gradle 8.4)
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --sdk_root=$ANDROID_HOME --licenses || true
+
+      - name: Prepare assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp www/index.html android/app/src/main/assets/
+          cp www/app.js android/app/src/main/assets/
+          cp www/aes-js.min.js android/app/src/main/assets/ 2>/dev/null || true
+          ls -la android/app/src/main/assets/
+
+      - name: Setup Gradle (no wrapper cache)
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 8.4
           build-root-directory: android
-          arguments: wrapper --no-daemon --stacktrace
-        # 生成 gradlew + gradle/wrapper/gradle-wrapper.jar
 
-      - name: Verify wrapper
+      - name: Build Debug APK
+        run: gradle assembleDebug --no-daemon
         working-directory: android
-        run: |
-          ls -la gradlew gradle/wrapper/gradle-wrapper.jar
-          ./gradlew --version
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
-
-      - name: Prepare assets
-        working-directory: android
-        run: |
-          mkdir -p app/src/main/assets
-          cp -r ../www/* app/src/main/assets/
-          ls -la app/src/main/assets/
-
-      - name: Build Debug APK (capture logs on failure)
-        id: build
-        continue-on-error: true
-        working-directory: android
-        run: |
-          ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/gradle.log
-          echo "GRADLE_EXIT=${PIPESTATUS[0]}" >> $GITHUB_ENV
-
-      - name: Dump build error to step summary
-        if: steps.build.outcome != 'success'
-        run: |
-          echo "### ❌ Gradle build failed" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -n 80 /tmp/gradle.log >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          # 也打印到控制台（虽然读不到，但便于 GitHub 网页查看）
-          tail -n 80 /tmp/gradle.log || true
-          exit 1
-
-      - name: List APK outputs
-        if: steps.build.outcome == 'success'
-        working-directory: android
-        run: find app/build/outputs/apk -name "*.apk" -exec ls -la {} \;
 
       - name: Rename APK
-        if: steps.build.outcome == 'success'
-        working-directory: android
         run: |
-          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
-          cp "$APK" ../NCM-Decoder-Pro.apk
-          ls -la ../NCM-Decoder-Pro.apk
+          mv android/app/build/outputs/apk/debug/app-debug.apk \
+             android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
 
       - name: Upload APK artifact
-        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
-          path: NCM-Decoder-Pro.apk
+          path: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
 
       - name: Create Release
-        if: steps.build.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0-pro
-          name: NCM 解密器 Pro v2.0
-          files: NCM-Decoder-Pro.apk
-          body: |
-            ## NCM 解密器 Pro —— 全新版本
-
-            - 📦 应用名：**NCM 解密器 Pro**
-            - 📦 包名：`com.ncmdecoder.pro`
-            - 📦 APK：`NCM-Decoder-Pro.apk`
-            - 📦 Release：`v2.0-pro`
+          name: NCM Decoder Pro v2.0
+          files: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
