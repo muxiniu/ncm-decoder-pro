@@ -70,15 +70,13 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-            const { execSync } = require('child_process');
             const apkDir = 'android/app/build/outputs/apk/debug';
             const files = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
-            if (!files.length) throw new Error('no APK found');
+            if (!files.length) throw new Error('no APK found in ' + apkDir);
             const apkPath = path.join(apkDir, files[0]);
             const apkData = fs.readFileSync(apkPath);
             const { owner, repo } = context.repo;
             const tag = 'v2.0-pro';
-            // get or create release
             let release;
             try {
               release = await github.rest.repos.getReleaseByTagName({ owner, repo, tag });
@@ -88,10 +86,9 @@ jobs:
               });
             }
             const release_id = release.data.id;
-            // delete existing asset if any
             const assets = await github.rest.repos.listReleaseAssets({ owner, repo, release_id });
             for (const a of assets.data) {
-              if (a.name === files[0]) {
+              if (a.name === 'NCM-Decoder-Pro.apk') {
                 await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: a.id });
               }
             }
@@ -101,3 +98,11 @@ jobs:
               data: apkData,
             });
             console.log('RELEASE_URL=' + release.data.html_url);
+        continue-on-error: true
+
+      - name: Print release step error
+        if: failure()
+        run: |
+          echo "Release step failed. Build & artifact upload were successful."
+          echo "APK is available in the 'NCM-Decoder-Pro' artifact of this run."
+          echo "Download from: https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
