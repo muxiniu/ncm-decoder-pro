@@ -1,32 +1,52 @@
-# NCM 解密器 Pro (NCM Decoder Pro)
+# 🎵 NCM 解密器 Pro
 
-把网易云音乐 `.ncm` 文件一键解密为 `.mp3` / `.flac`，**手机端离线处理，不上传任何服务器**。
+> 全新版本 —— 与旧版 `ncm-converter-android` **完全区分**（不同包名、不同应用名、可并存）
 
-> 与旧版 `ncm-converter-android` 完全区分：应用名 **NCM 解密器 Pro**、包名 `com.ncmdecoder.pro`、APK `NCM-Decoder-Pro.apk`、版本 `v2.0`。
+将网易云音乐 `.ncm` 加密文件一键转换为标准 **MP3 / FLAC** 的 Android 工具。
 
-## 功能
-- 解析 NCM 文件头（magic、密钥、元数据）
-- AES-128-ECB 解密密钥 → RC4 密钥
-- RC4 解密音频数据流，自动识别 MP3 / FLAC / M4A
-- 自定义文件名模板 `{artist} - {title}`
-- **修复文件选择器无响应**（重写 `onShowFileChooser` + JSBridge 对齐）
+| 项目 | 值 |
+|------|-----|
+| 应用名 | **NCM 解密器 Pro** |
+| 包名 | `com.ncmdecoder.pro` |
+| 版本 | v2.0 |
+| APK | `NCM-Decoder-Pro.apk` |
 
-## 结构
+## ✨ 功能
+
+- 📂 **选择文件** —— 点按钮弹出系统文件选择器（支持多选）
+- 📁 **选择保存位置** —— 点按钮弹出文件夹选择器
+- 🎚 **输出格式** —— 自动检测 / MP3 / FLAC
+- ✏️ **文件名模板** —— 只需填名字（如 `{artist} - {title}`），扩展名自动加
+
+## 🚀 使用
+
+1. 下载 `NCM-Decoder-Pro.apk` 安装
+2. 打开 App → 点「**选择 NCM 文件**」→ 选中 `.ncm`
+3. 点「**选择保存位置**」→ 选一个文件夹
+4. （可选）修改文件名模板、输出格式
+5. 点「**开始转换**」→ 完成
+
+## 🔧 技术说明
+
+- **前端**：纯 HTML + JS，运行在 WebView 中
+- **解密**：AES-128-ECB（种子密钥）+ RC4（music 流）
+- **桥接**：JS ↔ Java 通过 `window.Android`（方法：`pickFiles` / `pickFolder` / `saveFile`）
+
+## 🏗 本地构建
+
+```bash
+cd android
+./gradlew assembleDebug
+# 产物：android/app/build/outputs/apk/debug/app-debug.apk
 ```
-www/                        # 前端 (WebView)
-android/                    # 原生工程 (com.ncmdecoder.pro)
-  app/build.gradle           # copyAssets: ../../www -> assets
-.github/workflows/build-apk.yml   # 自动构建 APK
-```
 
-## 构建
-详见 **[QUICKSTART.md](./QUICKSTART.md)**。
+## 📦 自动构建
 
-## 使用
-选择 `.ncm` → 选保存文件夹 → 开始转换。
+推送到 `main` 分支后，GitHub Actions 自动：
+1. 编译 APK
+2. 重命名为 `NCM-Decoder-Pro.apk`
+3. 发布到 Release `v2.0-pro`
 
-## 验证
-解密核心、桥接对齐、转义安全测试均通过（60+ 项）。
+## ⚠️ 免责声明
 
-## License
-MIT
+仅供学习研究，请尊重版权，不要用于商业用途。

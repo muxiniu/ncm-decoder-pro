@@ -1,4 +1,20 @@
-android/app/build/
-android/build/
-*.apk
+# OS / IDE
+.DS_Store
 .idea/
+*.iml
+.vscode/
+
+# Android build
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.gradle/
+*.apk
+!NCM-Decoder-Pro.apk
+
+# Node
+node_modules/
+
+# Logs
+*.log

@@ -1,0 +1,86 @@
+name: Build NCM Decoder Pro APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" || true
+
+      - name: Prepare assets
+        working-directory: android
+        run: |
+          mkdir -p app/src/main/assets
+          cp -r ../www/* app/src/main/assets/
+          ls -la app/src/main/assets/
+
+      - name: Grant execute permission for gradlew
+        working-directory: android
+        run: chmod +x ./gradlew || true
+
+      - name: Build Debug APK
+        working-directory: android
+        run: |
+          if [ -x ./gradlew ]; then
+            ./gradlew assembleDebug --no-daemon
+          else
+            gradle assembleDebug --no-daemon
+          fi
+
+      - name: Rename APK
+        working-directory: android
+        run: |
+          find app/build/outputs/apk -name "*.apk" -exec ls -la {} \;
+          cp app/build/outputs/apk/debug/app-debug.apk ../NCM-Decoder-Pro.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NCM-Decoder-Pro
+          path: NCM-Decoder-Pro.apk
+
+      - name: Create / Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v2.0-pro
+          name: NCM 解密器 Pro v2.0
+          files: NCM-Decoder-Pro.apk
+          body: |
+            ## NCM 解密器 Pro —— 全新版本（与旧版 `ncm-converter-android` 完全区分）
+
+            - 📦 应用名：**NCM 解密器 Pro**
+            - 📦 包名：`com.ncmdecoder.pro`
+            - 📦 APK：`NCM-Decoder-Pro.apk`
+
+            ### 使用
+            1. 打开 App → 点「选择 NCM 文件」
+            2. 点「选择保存位置」
+            3. 点「开始转换」
+
+            ### 修复
+            - ✅ 修复了文件选择器点击无响应问题
+            - ✅ JS ↔ Java 桥接统一为 `window.Android`
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
