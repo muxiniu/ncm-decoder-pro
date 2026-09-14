@@ -1,0 +1,29 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 33
+
+    defaultConfig {
+        // 与旧版 com.ncmconverter.app 区分，避免安装冲突
+        applicationId "com.ncmdecoder.pro"
+        minSdkVersion 21
+        targetSdkVersion 33
+        versionCode 2
+        versionName "2.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    // 将 www/ 目录下的前端资源复制到 assets/
+    task copyAssets(type: Copy) {
+        from '../../www'
+        into 'src/main/assets'
+        include '**/*'
+    }
+
+    preBuild.dependsOn copyAssets
+}
