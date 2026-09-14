@@ -2,121 +2,48 @@ name: Build NCM Decoder Pro APK
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
-
-permissions:
-  contents: write
-  issues: write   # 允许创建 issue 来上报诊断
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android
-
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: "17"
-          distribution: "temurin"
+          distribution: temurin
+          java-version: 17
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          api-level: 33
-          build-tools: "33.0.2"
 
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
-
-      - name: Install Gradle 8.4
+      - name: Copy www assets into app/src/main/assets/www
         run: |
-          export GRADLE_HOME=/opt/gradle-8.4
-          if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
-            sudo apt-get update -qq && sudo apt-get install -y -qq unzip
-            curl -sL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.4-bin.zip
-            sudo unzip -q /tmp/gradle.zip -d /opt/
-          fi
-          echo "$GRADLE_HOME/bin" >> $GITHUB_PATH
-          gradle --version
+          mkdir -p android/app/src/main/assets/www
+          cp www/index.html android/app/src/main/assets/www/
+          cp www/app.js     android/app/src/main/assets/www/
+          cp www/aes-js.min.js android/app/src/main/assets/www/
+          ls -la android/app/src/main/assets/www
 
-      - name: Generate wrapper + verify project
+      - name: Ensure gradle wrapper (generate if missing)
+        working-directory: android
         run: |
-          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+          if [ ! -f gradlew ]; then
             gradle wrapper --gradle-version 8.4
           fi
-          chmod +x gradlew 2>/dev/null || true
-          echo "=== android/ contents ==="; ls -la
-          echo "=== app/build.gradle ==="; cat app/build.gradle
+          chmod +x gradlew
 
-      - name: Build Debug APK
-        id: build
-        continue-on-error: true   # 即使构建失败也继续到诊断步骤
-        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+      - name: Assemble Debug APK
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Capture full diagnostics
-        if: always()
-        run: |
-          {
-            echo "=== working directory: $(pwd) ==="
-            echo "=== android/ tree (depth 3) ==="
-            ls -laR . 2>/dev/null | head -200
-            echo "=== ALL .apk files under android/ ==="
-            find . -name "*.apk" -type f 2>/dev/null || echo "(none found under android/)"
-            echo "=== app/build/outputs/ (if exists) ==="
-            ls -laR app/build/outputs 2>/dev/null || echo "(app/build/outputs does not exist)"
-            echo "=== build.log tail ==="
-            tail -80 /tmp/build.log 2>/dev/null || echo "(no build.log)"
-          } > /tmp/diag.txt
-          echo "===== DIAGNOSTICS ====="
-          cat /tmp/diag.txt
-
-      - name: Report diagnostics on failure
-        if: steps.build.outcome != 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            let diag = '';
-            try { diag = fs.readFileSync('/tmp/diag.txt', 'utf8'); } catch(e) { diag = 'no diag captured'; }
-            const buildLog = (() => { try { return fs.readFileSync('/tmp/build.log','utf8').slice(-3000); } catch(e){ return ''; } })();
-            const body = `## Build #${context.runNumber} failed\n\n### Diagnostics\n\n\`\`\`\n${diag.slice(0,6000)}\n\`\`\`\n\n### Build log tail\n\n\`\`\`\n${buildLog.slice(0,3000)}\n\`\`\``;
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title: `CI build #${context.runNumber} diagnostic`,
-              body: body,
-              labels: ['ci-diagnostic']
-            });
-
-      - name: Rename & Upload (only if build succeeded)
-        if: steps.build.outcome == 'success'
-        run: |
-          APK=$(find . -name "*.apk" -type f | head -n 1)
-          echo "Found APK: $APK"
-          mkdir -p app/build/outputs/apk/debug
-          mv "$APK" "app/build/outputs/apk/debug/NCM-Decoder-Pro.apk"
-          ls -la app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
-        shell: bash
-
-      - name: Upload APK artifact
-        if: steps.build.outcome == 'success'
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
-          path: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
-
-      - name: Create GitHub Release
-        if: steps.build.outcome == 'success'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v2.0-pro
-          name: "NCM Decoder Pro v2.0"
-          files: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: android/app/build/outputs/apk/debug/*.apk
