@@ -5,16 +5,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# 需要 write 权限创建 release
 permissions:
   contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: android   # gradle root = android/
 
     steps:
       - uses: actions/checkout@v4
@@ -34,31 +30,56 @@ jobs:
       - name: Accept SDK licenses
         run: yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
 
+      - name: Install Gradle 8.4 manually
+        run: |
+          # 手动下载并安装 gradle 8.4，避免 gradle-build-action 的 wrapper 自动生成问题
+          export GRADLE_HOME=/opt/gradle-8.4
+          if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
+            curl -sL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.4-bin.zip
+            sudo unzip -q /tmp/gradle.zip -d /opt/
+          fi
+          echo "$GRADLE_HOME/bin" >> $GITHUB_PATH
+          gradle --version
+
+      - name: Ensure gradle wrapper jar exists
+        working-directory: android
+        run: |
+          # 如果没有 gradle-wrapper.jar，用安装的 gradle 生成
+          if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "wrapper jar missing -> generating..."
+            gradle wrapper --gradle-version 8.4
+          fi
+          ls -la gradle/wrapper/
+
       - name: Verify project structure
+        working-directory: android
         run: |
           echo "== gradle root (android/) =="
+          pwd
           ls -la
           echo "== app module =="
           ls -la app/
-          echo "== wrapper =="
-          ls -la gradle/wrapper/ || echo "no wrapper dir"
           echo "== www (assets source) =="
           ls -la ../www/
 
-      - name: Build Debug APK
-        # gradle-build-action 自动下载 Gradle 8.4 + 生成 wrapper
-        uses: gradle/gradle-build-action@v3
+      - name: Build Debug APK (full log to console)
+        working-directory: android
+        # 关键：--info 把错误原因打印到控制台日志，无需下载日志文件
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/build.log
+
+      - name: On failure -> upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          build-root-directory: android
-          gradle-version: 8.4
-          arguments: assembleDebug --no-daemon --stacktrace
+          name: build-log
+          path: /tmp/build.log
 
       - name: Rename APK
         if: success()
         run: |
-          mv app/build/outputs/apk/debug/app-debug.apk \
-             app/build/outputs/apk/debug/NCM-Decoder-Pro.apk 2>/dev/null || true
-          ls -la app/build/outputs/apk/debug/
+          mv android/app/build/outputs/apk/debug/app-debug.apk \
+             android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk 2>/dev/null || true
+          ls -la android/app/build/outputs/apk/debug/
 
       - name: Upload APK artifact
         if: success()
