@@ -27,7 +27,22 @@ jobs:
 
       - name: Install SDK packages
         run: |
-          sdkmanager "platform-tools" "platforms;android-30" "build-tools;30.0.3" || true
+          sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
+
+      - name: Install Gradle 8.4 (to bootstrap wrapper)
+        run: |
+          if ! command -v gradle &> /dev/null; then
+            wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
+            sudo unzip -q /tmp/gradle.zip -d /opt/
+            echo 'export PATH=$PATH:/opt/gradle-8.4/bin' >> $GITHUB_ENV
+            echo 'export GRADLE_HOME=/opt/gradle-8.4' >> $GITHUB_ENV
+            export PATH=$PATH:/opt/gradle-8.4/bin
+          fi
+          gradle --version
+
+      - name: Generate gradle wrapper (creates gradle-wrapper.jar)
+        working-directory: android
+        run: gradle wrapper --gradle-version 8.4
 
       - name: Prepare assets
         working-directory: android
@@ -36,24 +51,20 @@ jobs:
           cp -r ../www/* app/src/main/assets/
           ls -la app/src/main/assets/
 
-      - name: Grant execute permission for gradlew
-        working-directory: android
-        run: chmod +x ./gradlew || true
-
       - name: Build Debug APK
         working-directory: android
-        run: |
-          if [ -x ./gradlew ]; then
-            ./gradlew assembleDebug --no-daemon
-          else
-            gradle assembleDebug --no-daemon
-          fi
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: List APK outputs
+        working-directory: android
+        run: find app/build/outputs/apk -name "*.apk" -exec ls -la {} \;
 
       - name: Rename APK
         working-directory: android
         run: |
-          find app/build/outputs/apk -name "*.apk" -exec ls -la {} \;
-          cp app/build/outputs/apk/debug/app-debug.apk ../NCM-Decoder-Pro.apk
+          APK=$(find app/build/outputs/apk -name "*.apk" | head -1)
+          cp "$APK" ../NCM-Decoder-Pro.apk
+          ls -la ../NCM-Decoder-Pro.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -73,14 +84,10 @@ jobs:
             - 📦 应用名：**NCM 解密器 Pro**
             - 📦 包名：`com.ncmdecoder.pro`
             - 📦 APK：`NCM-Decoder-Pro.apk`
+            - 📦 Release：`v2.0-pro`
 
             ### 使用
-            1. 打开 App → 点「选择 NCM 文件」
-            2. 点「选择保存位置」
-            3. 点「开始转换」
-
-            ### 修复
-            - ✅ 修复了文件选择器点击无响应问题
-            - ✅ JS ↔ Java 桥接统一为 `window.Android`
+            1. 下载 `NCM-Decoder-Pro.apk` 安装
+            2. 打开 App → 选择 NCM 文件 → 选择保存文件夹 → 转换
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
