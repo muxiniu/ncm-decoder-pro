@@ -22,7 +22,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Copy www assets into app/src/main/assets/www
+      - name: Copy www assets to assets/www
         run: |
           mkdir -p android/app/src/main/assets/www
           cp www/index.html android/app/src/main/assets/www/
@@ -30,17 +30,13 @@ jobs:
           cp www/aes-js.min.js android/app/src/main/assets/www/
           ls -la android/app/src/main/assets/www
 
-      - name: Ensure gradle wrapper (generate if missing)
+      - name: Grant execute permission to gradlew
         working-directory: android
-        run: |
-          if [ ! -f gradlew ]; then
-            gradle wrapper --gradle-version 8.4
-          fi
-          chmod +x gradlew
+        run: chmod +x gradlew
 
-      - name: Assemble Debug APK
+      - name: Build Debug APK with gradlew
         working-directory: android
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
