@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -59,12 +61,43 @@ jobs:
           name: NCM-Decoder-Pro
           path: android/app/build/outputs/apk/debug/*.apk
 
-      - name: Publish APK to release
+      - name: Publish APK to release (github-script)
         if: steps.build.outcome == 'success'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v2.0-pro
-          name: NCM Decoder Pro v2.0
-          files: android/app/build/outputs/apk/debug/*.apk
+        uses: actions/github-script@v7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { execSync } = require('child_process');
+            const apkDir = 'android/app/build/outputs/apk/debug';
+            const files = fs.readdirSync(apkDir).filter(f => f.endsWith('.apk'));
+            if (!files.length) throw new Error('no APK found');
+            const apkPath = path.join(apkDir, files[0]);
+            const apkData = fs.readFileSync(apkPath);
+            const { owner, repo } = context.repo;
+            const tag = 'v2.0-pro';
+            // get or create release
+            let release;
+            try {
+              release = await github.rest.repos.getReleaseByTagName({ owner, repo, tag });
+            } catch(e) {
+              release = await github.rest.repos.createRelease({
+                owner, repo, tag_name: tag, name: 'NCM Decoder Pro v2.0', draft: false
+              });
+            }
+            const release_id = release.data.id;
+            // delete existing asset if any
+            const assets = await github.rest.repos.listReleaseAssets({ owner, repo, release_id });
+            for (const a of assets.data) {
+              if (a.name === files[0]) {
+                await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: a.id });
+              }
+            }
+            await github.rest.repos.uploadReleaseAsset({
+              owner, repo, release_id,
+              name: 'NCM-Decoder-Pro.apk',
+              data: apkData,
+            });
+            console.log('RELEASE_URL=' + release.data.html_url);
