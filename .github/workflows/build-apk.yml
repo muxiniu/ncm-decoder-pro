@@ -19,15 +19,41 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '11076708'
 
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
 
-      - name: Build Debug APK
+      - name: Verify project structure
         working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: |
+          echo "=== android dir ==="
+          ls -la
+          echo "=== app/src/main ==="
+          ls -la app/src/main
+          echo "=== app/src/main/res ==="
+          ls -R app/src/main/res
+          echo "=== gradle wrapper ==="
+          ls -la gradle/wrapper
+          echo "=== gradlew version ==="
+          ./gradlew --version || true
+
+      - name: Build Debug APK
+        id: build
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon --console=plain --info 2>&1 | tee /tmp/build.log
+        continue-on-error: true
+
+      - name: Upload build log on failure
+        if: steps.build.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
 
       - name: Upload APK
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
