@@ -22,27 +22,10 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept SDK licenses
-        run: yes | sdkmanager --licenses || true
-
-      - name: Install SDK packages
+      - name: Accept SDK licenses & install packages
         run: |
+          yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
-
-      - name: Install Gradle 8.4 (to bootstrap wrapper)
-        run: |
-          if ! command -v gradle &> /dev/null; then
-            wget -q https://services.gradle.org/distributions/gradle-8.4-bin.zip -O /tmp/gradle.zip
-            sudo unzip -q /tmp/gradle.zip -d /opt/
-            echo 'export PATH=$PATH:/opt/gradle-8.4/bin' >> $GITHUB_ENV
-            echo 'export GRADLE_HOME=/opt/gradle-8.4' >> $GITHUB_ENV
-            export PATH=$PATH:/opt/gradle-8.4/bin
-          fi
-          gradle --version
-
-      - name: Generate gradle wrapper (creates gradle-wrapper.jar)
-        working-directory: android
-        run: gradle wrapper --gradle-version 8.4
 
       - name: Prepare assets
         working-directory: android
@@ -51,13 +34,12 @@ jobs:
           cp -r ../www/* app/src/main/assets/
           ls -la app/src/main/assets/
 
-      - name: Build Debug APK
-        working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
-
-      - name: List APK outputs
-        working-directory: android
-        run: find app/build/outputs/apk -name "*.apk" -exec ls -la {} \;
+      - name: Build Debug APK with Gradle
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.4
+          build-root-directory: android
+          arguments: assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         working-directory: android
@@ -72,14 +54,14 @@ jobs:
           name: NCM-Decoder-Pro
           path: NCM-Decoder-Pro.apk
 
-      - name: Create / Update Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0-pro
           name: NCM 解密器 Pro v2.0
           files: NCM-Decoder-Pro.apk
           body: |
-            ## NCM 解密器 Pro —— 全新版本（与旧版 `ncm-converter-android` 完全区分）
+            ## NCM 解密器 Pro —— 全新版本
 
             - 📦 应用名：**NCM 解密器 Pro**
             - 📦 包名：`com.ncmdecoder.pro`
