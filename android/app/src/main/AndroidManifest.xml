@@ -2,21 +2,25 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.ncmdecoder.pro">
 
-    <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="30" />
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="33" />
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <application
-        android:label="NCM 解密器 Pro"
         android:allowBackup="true"
+        android:label="NCM 解密器 Pro"
         android:supportsRtl="true"
-        android:requestLegacyExternalStorage="true">
+        android:requestLegacyExternalStorage="true"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden">
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
