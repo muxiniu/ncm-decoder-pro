@@ -16,25 +16,43 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
           
-      - name: Debug & Grant Permission
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        
+      - name: Debug Directory & Permission
         run: |
+          echo "=== Current Dir ==="
           pwd
+          echo "=== Root Files ==="
           ls -la
-          ls -la android/ || echo "android dir not found"
-          ls -la android/gradlew || echo "gradlew not found"
-          chmod +x android/gradlew || echo "chmod failed"
+          echo "=== Android Dir (if exists) ==="
+          ls -la android/ || echo "NO android dir"
+          echo "=== Gradlew Check ==="
+          if [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+            GRADLEW="android/gradlew"
+          elif [ -f "gradlew" ]; then
+            chmod +x gradlew
+            GRADLEW="./gradlew"
+          else
+            echo "ERROR: gradlew not found!" && exit 1
+          fi
+          echo "Using: $GRADLEW"
           
       - name: Build Debug APK
-        working-directory: android
-        run: bash gradlew :app:assembleDebug --no-daemon
+        run: |
+          if [ -z "$GRADLEW" ]; then echo "GRADLEW not set"; exit 1; fi
+          $GRADLEW :app:assembleDebug --no-daemon --stacktrace
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
-          path: android/app/build/outputs/apk/debug/*.apk
+          path: |
+            android/app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/debug/*.apk
