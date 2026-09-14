@@ -23,31 +23,38 @@ jobs:
           
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        
-      - name: Debug Directory & Permission
+        with:
+          api-level: 34
+          build-tools: 34.0.0
+          
+      - name: Debug & Build APK (One Step)
         run: |
-          echo "=== Current Dir ==="
+          echo "=== 1. Directory Check ==="
           pwd
-          echo "=== Root Files ==="
           ls -la
-          echo "=== Android Dir (if exists) ==="
-          ls -la android/ || echo "NO android dir"
-          echo "=== Gradlew Check ==="
+          
+          # 自动寻找 gradlew（支持根目录或 android 子目录）
+          GRADLEW=""
           if [ -f "android/gradlew" ]; then
-            chmod +x android/gradlew
             GRADLEW="android/gradlew"
           elif [ -f "gradlew" ]; then
-            chmod +x gradlew
             GRADLEW="./gradlew"
           else
-            echo "ERROR: gradlew not found!" && exit 1
+            echo "❌ ERROR: gradlew not found in root or android/!"
+            ls -R
+            exit 1
           fi
-          echo "Using: $GRADLEW"
           
-      - name: Build Debug APK
-        run: |
-          if [ -z "$GRADLEW" ]; then echo "GRADLEW not set"; exit 1; fi
-          $GRADLEW :app:assembleDebug --no-daemon --stacktrace
+          echo "✅ Found gradlew at: $GRADLEW"
+          chmod +x $GRADLEW
+          
+          echo "=== 2. Android Env ==="
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          
+          echo "=== 3. Building Debug APK ==="
+          # 尝试带 :app 模块编译，若失败则退而求其次直接编译
+          $GRADLEW :app:assembleDebug --no-daemon --stacktrace || $GRADLEW assembleDebug --no-daemon --stacktrace
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -56,3 +63,4 @@ jobs:
           path: |
             android/app/build/outputs/apk/debug/*.apk
             app/build/outputs/apk/debug/*.apk
+            build/outputs/apk/debug/*.apk
