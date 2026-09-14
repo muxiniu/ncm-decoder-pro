@@ -21,12 +21,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           
-      - name: Grant execute permission
-        run: chmod +x android/gradlew
-        
+      - name: Debug & Grant Permission
+        run: |
+          pwd
+          ls -la
+          ls -la android/ || echo "android dir not found"
+          ls -la android/gradlew || echo "gradlew not found"
+          chmod +x android/gradlew || echo "chmod failed"
+          
       - name: Build Debug APK
         working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: bash gradlew :app:assembleDebug --no-daemon
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
