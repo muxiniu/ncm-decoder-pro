@@ -1,52 +1,70 @@
-# 🎵 NCM 解密器 Pro
+# NCM 解密器 Pro
 
-> 全新版本 —— 与旧版 `ncm-converter-android` **完全区分**（不同包名、不同应用名、可并存）
+将网易云音乐 `.ncm` 文件转换为标准 MP3/FLAC/M4A 格式的 Android 应用。
 
-将网易云音乐 `.ncm` 加密文件一键转换为标准 **MP3 / FLAC** 的 Android 工具。
+## 功能
 
-| 项目 | 值 |
-|------|-----|
-| 应用名 | **NCM 解密器 Pro** |
-| 包名 | `com.ncmdecoder.pro` |
-| 版本 | v2.0 |
-| APK | `NCM-Decoder-Pro.apk` |
+- 📱 选择单个或多个 NCM 文件
+- 📁 选择输出文件夹
+- 🎵 自动检测输出格式（MP3 / FLAC / M4A）
+- 🔓 完整的 NCM 解密（AES-128 + RC4）
+- 💾 直接保存到用户选择的文件夹
 
-## ✨ 功能
+## 技术原理
 
-- 📂 **选择文件** —— 点按钮弹出系统文件选择器（支持多选）
-- 📁 **选择保存位置** —— 点按钮弹出文件夹选择器
-- 🎚 **输出格式** —— 自动检测 / MP3 / FLAC
-- ✏️ **文件名模板** —— 只需填名字（如 `{artist} - {title}`），扩展名自动加
+NCM 文件格式：
+1. **Header**: `CTMF` magic + reserved
+2. **Encrypted Key**: AES-128-ECB 加密的 16 字节音频密钥
+3. **Metadata**: JSON 格式的歌曲信息（XOR 编码）
+4. **Audio Data**: RC4 加密的音频数据
 
-## 🚀 使用
+解密流程：
+```
+encrypted_key → AES-128-ECB(seed_key) → XOR 0x64 → reverse → audio_key
+audio_data → RC4(audio_key) → raw audio
+```
 
-1. 下载 `NCM-Decoder-Pro.apk` 安装
-2. 打开 App → 点「**选择 NCM 文件**」→ 选中 `.ncm`
-3. 点「**选择保存位置**」→ 选一个文件夹
-4. （可选）修改文件名模板、输出格式
-5. 点「**开始转换**」→ 完成
+## 项目结构
 
-## 🔧 技术说明
+```
+ncm-decoder-pro/
+├── www/                      # 前端 (WebView)
+│   ├── index.html            # 界面
+│   ├── app.js                # NCM 解密核心
+│   └── aes-js.min.js         # AES 库
+├── android/                   # 安卓原生工程
+│   ├── build.gradle          # 根构建脚本
+│   ├── settings.gradle
+│   └── app/
+│       ├── build.gradle
+│       └── src/main/
+│           ├── AndroidManifest.xml
+│           └── java/com/ncmdecoder/pro/
+│               └── MainActivity.java   # WebView + 文件选择 + JS 桥接
+├── .github/workflows/
+│   └── build-apk.yml         # 自动构建 APK
+└── README.md
+```
 
-- **前端**：纯 HTML + JS，运行在 WebView 中
-- **解密**：AES-128-ECB（种子密钥）+ RC4（music 流）
-- **桥接**：JS ↔ Java 通过 `window.Android`（方法：`pickFiles` / `pickFolder` / `saveFile`）
+## 构建
 
-## 🏗 本地构建
+### 本地构建
 
 ```bash
 cd android
 ./gradlew assembleDebug
-# 产物：android/app/build/outputs/apk/debug/app-debug.apk
+# APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
-## 📦 自动构建
+### GitHub Actions 自动构建
 
-推送到 `main` 分支后，GitHub Actions 自动：
-1. 编译 APK
-2. 重命名为 `NCM-Decoder-Pro.apk`
-3. 发布到 Release `v2.0-pro`
+推送到 `main` 分支后自动触发，产物为 `NCM-Decoder-Pro.apk`。
 
-## ⚠️ 免责声明
+## 版本
 
-仅供学习研究，请尊重版权，不要用于商业用途。
+- v2.0 (NCM 解密器 Pro) — 全新重写
+- 包名: `com.ncmdecoder.pro`（与旧版 `com.ncmconverter.app` 区分）
+
+## License
+
+MIT
