@@ -1,20 +1,25 @@
-# OS / IDE
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
 .idea/
 *.iml
 .vscode/
 
-# Android build
-android/.gradle/
-android/build/
-android/app/build/
-android/local.properties
-android/.gradle/
+# Android
 *.apk
-!NCM-Decoder-Pro.apk
+*.aab
+*.keystore
+build/
+.gradle/
+local.properties
+captures/
 
 # Node
 node_modules/
-
-# Logs
 *.log
+
+# Test artifacts
+test_*.js
+final_check.js
