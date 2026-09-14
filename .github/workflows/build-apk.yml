@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android   # 统一以 android/ 为 gradle root
 
     steps:
       - uses: actions/checkout@v4
@@ -32,9 +35,9 @@ jobs:
 
       - name: Install Gradle 8.4 manually
         run: |
-          # 手动下载并安装 gradle 8.4，避免 gradle-build-action 的 wrapper 自动生成问题
           export GRADLE_HOME=/opt/gradle-8.4
           if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq unzip
             curl -sL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.4-bin.zip
             sudo unzip -q /tmp/gradle.zip -d /opt/
           fi
@@ -42,19 +45,16 @@ jobs:
           gradle --version
 
       - name: Ensure gradle wrapper jar exists
-        working-directory: android
         run: |
-          # 如果没有 gradle-wrapper.jar，用安装的 gradle 生成
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
             echo "wrapper jar missing -> generating..."
             gradle wrapper --gradle-version 8.4
           fi
           ls -la gradle/wrapper/
+          ls -la gradlew 2>/dev/null || echo "no gradlew file"
 
       - name: Verify project structure
-        working-directory: android
         run: |
-          echo "== gradle root (android/) =="
           pwd
           ls -la
           echo "== app module =="
@@ -63,8 +63,7 @@ jobs:
           ls -la ../www/
 
       - name: Build Debug APK (full log to console)
-        working-directory: android
-        # 关键：--info 把错误原因打印到控制台日志，无需下载日志文件
+        # 用 gradlew（已生成wrapper），--info 打印完整错误
         run: ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/build.log
 
       - name: On failure -> upload build log
@@ -74,18 +73,23 @@ jobs:
           name: build-log
           path: /tmp/build.log
 
-      - name: Rename APK
+      - name: Find & Rename APK (show real error, no masking)
         if: success()
+        # 统一在 android/ 下工作，APK 位于 app/build/outputs/apk/debug/
         run: |
-          mv android/app/build/outputs/apk/debug/app-debug.apk \
-             android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk 2>/dev/null || true
-          ls -la android/app/build/outputs/apk/debug/
+          echo "== listing build outputs =="
+          ls -la app/build/outputs/apk/debug/ || true
+          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          echo "Found APK: $APK"
+          mv "$APK" "app/build/outputs/apk/debug/NCM-Decoder-Pro.apk"
+          ls -la app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
 
       - name: Upload APK artifact
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
+          # upload-artifact 相对于 github.workspace (仓库根) 解析
           path: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
 
       - name: Create GitHub Release
@@ -94,6 +98,7 @@ jobs:
         with:
           tag_name: v2.0-pro
           name: "NCM Decoder Pro v2.0"
+          # release action 也相对于 github.workspace
           files: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
