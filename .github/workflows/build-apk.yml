@@ -7,13 +7,14 @@ on:
 
 permissions:
   contents: write
+  issues: write   # 允许创建 issue 来上报诊断
 
 jobs:
   build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: android   # 统一以 android/ 为 gradle root
+        working-directory: android
 
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +34,7 @@ jobs:
       - name: Accept SDK licenses
         run: yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses || true
 
-      - name: Install Gradle 8.4 manually
+      - name: Install Gradle 8.4
         run: |
           export GRADLE_HOME=/opt/gradle-8.4
           if [ ! -x "$GRADLE_HOME/bin/gradle" ]; then
@@ -44,61 +45,78 @@ jobs:
           echo "$GRADLE_HOME/bin" >> $GITHUB_PATH
           gradle --version
 
-      - name: Ensure gradle wrapper jar exists
+      - name: Generate wrapper + verify project
         run: |
           if [ ! -f gradle/wrapper/gradle-wrapper.jar ]; then
-            echo "wrapper jar missing -> generating..."
             gradle wrapper --gradle-version 8.4
           fi
-          ls -la gradle/wrapper/
-          ls -la gradlew 2>/dev/null || echo "no gradlew file"
+          chmod +x gradlew 2>/dev/null || true
+          echo "=== android/ contents ==="; ls -la
+          echo "=== app/build.gradle ==="; cat app/build.gradle
 
-      - name: Verify project structure
+      - name: Build Debug APK
+        id: build
+        continue-on-error: true   # 即使构建失败也继续到诊断步骤
+        run: ./gradlew assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/build.log
+
+      - name: Capture full diagnostics
+        if: always()
         run: |
-          pwd
-          ls -la
-          echo "== app module =="
-          ls -la app/
-          echo "== www (assets source) =="
-          ls -la ../www/
+          {
+            echo "=== working directory: $(pwd) ==="
+            echo "=== android/ tree (depth 3) ==="
+            ls -laR . 2>/dev/null | head -200
+            echo "=== ALL .apk files under android/ ==="
+            find . -name "*.apk" -type f 2>/dev/null || echo "(none found under android/)"
+            echo "=== app/build/outputs/ (if exists) ==="
+            ls -laR app/build/outputs 2>/dev/null || echo "(app/build/outputs does not exist)"
+            echo "=== build.log tail ==="
+            tail -80 /tmp/build.log 2>/dev/null || echo "(no build.log)"
+          } > /tmp/diag.txt
+          echo "===== DIAGNOSTICS ====="
+          cat /tmp/diag.txt
 
-      - name: Build Debug APK (full log to console)
-        # 用 gradlew（已生成wrapper），--info 打印完整错误
-        run: ./gradlew assembleDebug --no-daemon --stacktrace --info 2>&1 | tee /tmp/build.log
-
-      - name: On failure -> upload build log
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - name: Report diagnostics on failure
+        if: steps.build.outcome != 'success'
+        uses: actions/github-script@v7
         with:
-          name: build-log
-          path: /tmp/build.log
+          script: |
+            const fs = require('fs');
+            let diag = '';
+            try { diag = fs.readFileSync('/tmp/diag.txt', 'utf8'); } catch(e) { diag = 'no diag captured'; }
+            const buildLog = (() => { try { return fs.readFileSync('/tmp/build.log','utf8').slice(-3000); } catch(e){ return ''; } })();
+            const body = `## Build #${context.runNumber} failed\n\n### Diagnostics\n\n\`\`\`\n${diag.slice(0,6000)}\n\`\`\`\n\n### Build log tail\n\n\`\`\`\n${buildLog.slice(0,3000)}\n\`\`\``;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `CI build #${context.runNumber} diagnostic`,
+              body: body,
+              labels: ['ci-diagnostic']
+            });
 
-      - name: Find & Rename APK (show real error, no masking)
-        if: success()
-        # 统一在 android/ 下工作，APK 位于 app/build/outputs/apk/debug/
+      - name: Rename & Upload (only if build succeeded)
+        if: steps.build.outcome == 'success'
         run: |
-          echo "== listing build outputs =="
-          ls -la app/build/outputs/apk/debug/ || true
-          APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          APK=$(find . -name "*.apk" -type f | head -n 1)
           echo "Found APK: $APK"
+          mkdir -p app/build/outputs/apk/debug
           mv "$APK" "app/build/outputs/apk/debug/NCM-Decoder-Pro.apk"
           ls -la app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
+        shell: bash
 
       - name: Upload APK artifact
-        if: success()
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
-          # upload-artifact 相对于 github.workspace (仓库根) 解析
           path: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
 
       - name: Create GitHub Release
-        if: success()
+        if: steps.build.outcome == 'success'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0-pro
           name: "NCM Decoder Pro v2.0"
-          # release action 也相对于 github.workspace
           files: android/app/build/outputs/apk/debug/NCM-Decoder-Pro.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
