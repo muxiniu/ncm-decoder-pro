@@ -1,39 +1,19 @@
-apply plugin: 'com.android.application'
-
+plugins { id "com.android.application" }
 android {
-    namespace 'com.ncmdecoder.pro'
+    namespace "com.ncmdecoder.pro"
     compileSdk 33
-
     defaultConfig {
         applicationId "com.ncmdecoder.pro"
-        minSdk 21
-        targetSdk 33
-        versionCode 2
-        versionName "2.0"
+        minSdk 21; targetSdk 33
+        versionCode 2; versionName "2.0"
     }
-
+    buildTypes { release { minifyEnabled false } }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-
-    buildTypes {
-        debug {
-            debuggable true
-        }
-        release {
-            minifyEnabled false
-        }
-    }
-
-    sourceSets {
-        main {
-            assets.srcDirs = ['src/main/assets', '../../www']
-        }
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 }
-
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'androidx.webkit:webkit:1.10.0'
+    implementation "androidx.appcompat:appcompat:1.6.1"
+    implementation "androidx.webkit:webkit:1.10.0"
 }
