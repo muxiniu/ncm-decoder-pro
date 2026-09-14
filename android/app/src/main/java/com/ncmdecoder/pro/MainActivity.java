@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.view.ViewGroup;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -55,8 +56,12 @@ public class MainActivity extends AppCompatActivity {
             }, REQ_PERM);
         }
 
+        setContentView(R.layout.activity_main);
+        ViewGroup container = findViewById(R.id.container);
         web = new WebView(this);
-        setContentView(web);
+        container.addView(web, new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
 
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
