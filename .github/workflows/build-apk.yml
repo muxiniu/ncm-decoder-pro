@@ -19,10 +19,25 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Setup Gradle (install gradle 8.4 + generate wrapper jar)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.4
+          build-root-directory: android
+          arguments: wrapper --no-daemon
+        # 这一步会在 android/ 下生成 gradlew + gradle/wrapper/gradle-wrapper.jar
+
+      - name: Verify wrapper generated
+        working-directory: android
+        run: |
+          ls -la gradlew
+          ls -la gradle/wrapper/gradle-wrapper.jar
+          ./gradlew --version
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Accept SDK licenses & install packages
+      - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
           sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.2" || true
@@ -34,12 +49,13 @@ jobs:
           cp -r ../www/* app/src/main/assets/
           ls -la app/src/main/assets/
 
-      - name: Build Debug APK with Gradle
-        uses: gradle/gradle-build-action@v3
-        with:
-          gradle-version: 8.4
-          build-root-directory: android
-          arguments: assembleDebug --no-daemon --stacktrace
+      - name: Build Debug APK (via gradlew)
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: List APK outputs
+        working-directory: android
+        run: find app/build/outputs/apk -name "*.apk" -exec ls -la {} \;
 
       - name: Rename APK
         working-directory: android
