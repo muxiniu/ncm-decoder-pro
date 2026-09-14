@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace "com.ncmdecoder.pro"
+    namespace 'com.ncmdecoder.pro'
     compileSdk 33
 
     defaultConfig {
@@ -19,23 +19,9 @@ android {
             minifyEnabled false
         }
     }
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-
-    // 将仓库根目录的 www/ 作为 assets 打包进 APK
-    sourceSets {
-        main {
-            assets {
-                srcDirs = [file("$projectDir/../../www")]
-            }
-        }
-    }
 }
 
 dependencies {
-    implementation "androidx.appcompat:appcompat:1.6.1"
-    implementation "androidx.webkit:webkit:1.10.0"
+    implementation 'androidx.webkit:webkit:1.8.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
 }
