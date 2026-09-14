@@ -1,88 +1,31 @@
 name: Build NCM Decoder Pro APK
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
-  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: '11076708'
-
       - name: Grant execute permission for gradlew
         run: chmod +x android/gradlew
-
-      - name: Verify project structure
-        working-directory: android
-        run: |
-          echo "=== android dir ==="
-          ls -la
-          echo "=== app/src/main ==="
-          ls -la app/src/main
-          echo "=== app/src/main/res ==="
-          ls -R app/src/main/res
-          echo "=== gradle wrapper ==="
-          ls -la gradle/wrapper
-          echo "=== gradlew version ==="
-          ./gradlew --version || true
-
       - name: Build Debug APK
-        id: build
         working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon --console=plain --info 2>&1 | tee /tmp/build.log
-        continue-on-error: true
-
-      - name: Upload build log on failure
-        if: steps.build.outcome != 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
-
+        run: ./gradlew :app:assembleDebug --no-daemon
       - name: Upload APK
-        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: NCM-Decoder-Pro
           path: android/app/build/outputs/apk/debug/*.apk
-
-      - name: Commit APK to repo (apk/ directory)
-        if: steps.build.outcome == 'success'
-        working-directory: android
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          APK_SRC=$(ls app/build/outputs/apk/debug/*.apk | head -1)
-          mkdir -p ../apk
-          cp "$APK_SRC" ../apk/NCM-Decoder-Pro.apk
-          cd ..
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add apk/NCM-Decoder-Pro.apk
-          git commit -m "chore: publish NCM-Decoder-Pro.apk [skip ci]" || echo "no changes"
-          git push origin HEAD:main
-
-      - name: Print download info
-        if: steps.build.outcome == 'success'
-        run: |
-          echo "APK committed to: apk/NCM-Decoder-Pro.apk"
-          echo "Raw download: https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/main/apk/NCM-Decoder-Pro.apk"
